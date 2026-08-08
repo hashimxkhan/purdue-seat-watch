@@ -32,8 +32,8 @@ pip install -e .
 purdue-seat-watch check --term 202710 --subject CS --course 50200
 ```
 
-Term codes: Banner encodes Fall under the *next* calendar year, Spring/Summer
-under the current one — Fall 2026 is `202710`, Spring 2026 is `202620`,
+Term codes: Banner encodes Fall under the next calendar year, Spring/Summer
+under the current one so Fall 2026 is `202710`, Spring 2026 is `202620`,
 Summer 2026 is `202630`. (`purdue_seat_watch.term.term_code(year, season)`
 computes this if you'd rather not hardcode it.)
 
@@ -64,14 +64,14 @@ purdue-seat-watch watch watches.yaml --once # single pass, useful for testing
 ```
 
 Notifications are edge-triggered: you're notified when a watched section goes
-from 0 remaining (or hasn't been checked yet) to >0. Once a section is known
-to be open, it won't re-notify on every poll — but if it closes and reopens
+from 0 remaining (or hasn't been checked yet) to  greater than 0. Once a section is known
+to be open, it won't re-notify on every poll but if it closes and reopens
 later, you'll get notified again. **On the very first run, any section that's
 already open counts as newly opened**, so expect a notification for it right away.
 
 ## Running in the background
 
-The `macos` notifier is the only macOS-specific piece — swap in `console`
+The `macos` notifier is the only macOS-specific piece so you can just swap in `console`
 (or add your own `Notifier` in `notify.py`, e.g. email/webhook) to run this
 anywhere. By default, though, `purdue-seat-watch watch` just runs in the
 foreground of whatever terminal launched it and stops if that terminal closes.
