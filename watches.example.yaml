@@ -1,0 +1,27 @@
+# Copy this to watches.yaml and edit for the courses you're watching.
+#
+# Term codes: Banner encodes Fall under the *next* calendar year, Spring/Summer
+# under the current one. Fall 2026 -> 202710, Spring 2026 -> 202620, Summer 2026 -> 202630.
+# (purdue_seat_watch.term.term_code(year, season) computes this for you if you'd
+# rather script it than hardcode it.)
+
+interval_seconds: 60
+notifier: macos # or "console" if you're not on macOS / just want stdout
+
+watches:
+  # Watch every section of a course.
+  - term: "202710"
+    subject: CS
+    course_number: "18000"
+
+  # Watch one specific section only.
+  - term: "202710"
+    subject: CS
+    course_number: "50200"
+    section: LE1
+
+  # Skip the section search entirely if you already know the CRN(s).
+  # - term: "202710"
+  #   subject: CS
+  #   course_number: "38100"
+  #   crns: ["12345"]

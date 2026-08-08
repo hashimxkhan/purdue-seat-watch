@@ -1,0 +1,28 @@
+[project]
+name = "purdue-seat-watch"
+version = "0.1.0"
+description = "Watches Purdue Banner class seat counts and notifies you the moment a full course opens up"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "responses>=0.25"]
+
+[project.scripts]
+purdue-seat-watch = "purdue_seat_watch.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["purdue_seat_watch*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
