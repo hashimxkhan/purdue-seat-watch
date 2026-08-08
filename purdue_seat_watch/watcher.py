@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from typing import Protocol
 
 from purdue_seat_watch.models import Section, SeatInfo
-from purdue_seat_watch.notify import Notifier
+from purdue_seat_watch.notify import Notifier, NotifyEvent
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +33,22 @@ class WatcherConfig:
 
 
 class SeatWatcher:
-    def __init__(self, config: WatcherConfig, notifier: Notifier, banner: BannerClient):
+    def __init__(
+        self,
+        config: WatcherConfig,
+        notifier: Notifier,
+        banner: BannerClient,
+        *,
+        last_remaining: MutableMapping[str, int] | None = None,
+    ):
         self._config = config
         self._notifier = notifier
         self._banner = banner
-        self._last_remaining: dict[str, int] = {}
+        self._last_remaining: MutableMapping[str, int] = last_remaining if last_remaining is not None else {}
+
+    @property
+    def watches(self) -> tuple[Watch, ...]:
+        return self._config.watches
 
     def resolve_sections(self, watch: Watch) -> list[Section]:
         if watch.crns:
@@ -77,9 +89,19 @@ class SeatWatcher:
         logger.info("%s (CRN %s): %d/%d remaining", label, section.crn, seats.remaining, seats.capacity)
 
         if seats.is_open and not was_open:
+            event = NotifyEvent(
+                term=term,
+                subject=section.subject,
+                course_number=section.course_number,
+                section_code=section.section_code,
+                crn=section.crn,
+                remaining=seats.remaining,
+                capacity=seats.capacity,
+            )
             self._notifier.notify(
                 title=f"Seat open: {label}",
                 message=f"{seats.remaining} seat(s) now available (CRN {section.crn}).",
+                event=event,
             )
 
     def run_forever(self) -> None:

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Purdue Seat Watch</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { font-size: 1.4rem; }
+    p.tagline { color: #555; margin-top: -0.5rem; }
+    form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem; }
+    label { font-size: 0.85rem; font-weight: 600; }
+    input, select { padding: 0.5rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; }
+    .row { display: flex; gap: 0.75rem; }
+    .row > div { flex: 1; }
+    button { margin-top: 0.5rem; padding: 0.6rem; font-size: 1rem; border: none; border-radius: 6px; background: #cfb991; color: #000; font-weight: 600; cursor: pointer; }
+    button:hover { background: #b8a279; }
+    .status { padding: 0.75rem; border-radius: 6px; margin-top: 1rem; }
+    .status.subscribed { background: #e6f4ea; color: #1e7e34; }
+    .status.already_subscribed { background: #eef; color: #333; }
+    .errors { padding: 0.75rem; border-radius: 6px; margin-top: 1rem; background: #fdecea; color: #a4262c; }
+    .errors ul { margin: 0; padding-left: 1.2rem; }
+    small { color: #777; }
+  </style>
+</head>
+<body>
+  <h1>Purdue Seat Watch</h1>
+  <p class="tagline">Get an email the moment a full class opens up a seat.</p>
+
+  {% if status == "subscribed" %}
+    <div class="status subscribed">You're in! We'll email you at the address you gave once a seat opens.</div>
+  {% elif status == "already_subscribed" %}
+    <div class="status already_subscribed">You're already watching that course.</div>
+  {% endif %}
+
+  {% if errors %}
+    <div class="errors">
+      <ul>
+        {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <form method="post" action="/subscribe">
+    <div>
+      <label for="email">Purdue email</label>
+      <input id="email" name="email" type="email" placeholder="you@purdue.edu" required>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="year">Year</label>
+        <input id="year" name="year" type="number" min="2020" max="2100" placeholder="2026" required>
+      </div>
+      <div>
+        <label for="season">Season</label>
+        <select id="season" name="season" required>
+          <option value="fall">Fall</option>
+          <option value="spring">Spring</option>
+          <option value="summer">Summer</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="subject">Subject</label>
+        <input id="subject" name="subject" type="text" placeholder="CS" required>
+      </div>
+      <div>
+        <label for="course_number">Course number</label>
+        <input id="course_number" name="course_number" type="text" placeholder="35200" required>
+      </div>
+    </div>
+
+    <div>
+      <label for="section">Section (optional)</label>
+      <input id="section" name="section" type="text" placeholder="Leave blank to watch every section">
+    </div>
+
+    <button type="submit">Watch this course</button>
+    <small>Limited to {{ max_courses_per_email | default(3) }} courses per @purdue.edu address, {{ max_subscribers | default(200) }} subscribers total while we're small.</small>
+  </form>
+</body>
+</html>

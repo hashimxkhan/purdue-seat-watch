@@ -1,0 +1,12 @@
+# Copy to /etc/caddy/Caddyfile and replace with your actual domain once you have
+# one pointed at this VPS's public IP -- Caddy then handles HTTPS automatically
+# via Let's Encrypt, no certbot/nginx needed.
+#
+# yourdomain.com {
+#     reverse_proxy 127.0.0.1:8000
+# }
+
+# Until you have a domain, serve plain HTTP on the bare IP instead:
+:80 {
+    reverse_proxy 127.0.0.1:8000
+}

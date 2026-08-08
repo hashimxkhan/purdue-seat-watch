@@ -1,4 +1,5 @@
 from purdue_seat_watch.models import Section, SeatInfo
+from purdue_seat_watch.notify import NotifyEvent
 from purdue_seat_watch.watcher import SeatWatcher, Watch, WatcherConfig
 
 
@@ -35,9 +36,11 @@ class FakeBanner:
 class RecordingNotifier:
     def __init__(self):
         self.calls: list[tuple[str, str]] = []
+        self.events = []
 
-    def notify(self, title: str, message: str) -> None:
+    def notify(self, title: str, message: str, *, event=None) -> None:
         self.calls.append((title, message))
+        self.events.append(event)
 
 
 def _section(crn: str, section_code: str = "001") -> Section:
@@ -109,6 +112,35 @@ def test_explicit_crns_skip_the_section_search():
 
     assert banner.search_calls == 0
     assert len(notifier.calls) == 1
+
+
+def test_notify_receives_a_structured_event():
+    banner = FakeBanner(sections=[_section("111")], seat_sequences={"111": [_seats(0), _seats(8)]})
+    notifier = RecordingNotifier()
+    watcher = SeatWatcher(WatcherConfig(watches=(Watch(term="202710", subject="CS", course_number="50200"),)), notifier, banner)
+
+    watcher.check_once()
+    watcher.check_once()
+
+    assert notifier.events == [NotifyEvent(
+        term="202710", subject="CS", course_number="50200", section_code="001",
+        crn="111", remaining=8, capacity=30,
+    )]
+
+
+def test_last_remaining_store_can_be_injected():
+    store: dict[str, int] = {"111": 5}  # pre-seeded as already open, e.g. from a persisted store
+    banner = FakeBanner(sections=[_section("111")], seat_sequences={"111": [_seats(5)]})
+    notifier = RecordingNotifier()
+    watcher = SeatWatcher(
+        WatcherConfig(watches=(Watch(term="202710", subject="CS", course_number="50200"),)),
+        notifier, banner, last_remaining=store,
+    )
+
+    watcher.check_once()
+
+    assert notifier.calls == []  # already open per the injected store, so no edge transition
+    assert store["111"] == 5
 
 
 def test_a_failing_crn_does_not_stop_other_watches_from_being_checked():

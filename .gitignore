@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 watches.yaml
 logs/
+.env
+local.db
+local.db-*

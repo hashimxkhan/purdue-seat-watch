@@ -1,0 +1,15 @@
+[Unit]
+Description=purdue-seat-watch background poller
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO_DIR__
+EnvironmentFile=__REPO_DIR__/.env
+ExecStart=__REPO_DIR__/.venv/bin/python -m purdue_seat_watch.worker
+Restart=on-failure
+RestartSec=5
+User=__DEPLOY_USER__
+
+[Install]
+WantedBy=multi-user.target

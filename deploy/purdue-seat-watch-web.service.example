@@ -1,0 +1,15 @@
+[Unit]
+Description=purdue-seat-watch signup website
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO_DIR__
+EnvironmentFile=__REPO_DIR__/.env
+ExecStart=__REPO_DIR__/.venv/bin/uvicorn purdue_seat_watch.web:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+User=__DEPLOY_USER__
+
+[Install]
+WantedBy=multi-user.target
