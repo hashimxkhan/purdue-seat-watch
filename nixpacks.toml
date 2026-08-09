@@ -1,0 +1,5 @@
+# Railway builds this with Nixpacks. Its default Python install step doesn't
+# know about the "web" extras (fastapi/uvicorn/sqlalchemy/etc.) that both
+# Procfile processes need, so it's spelled out explicitly here.
+[phases.install]
+cmds = ["pip install -e '.[web]'"]
