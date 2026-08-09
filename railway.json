@@ -1,6 +1,6 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "buildCommand": "pip install -e '.[web]'"
+    "buildCommand": "pip install -e . fastapi uvicorn sqlalchemy psycopg2-binary resend jinja2 python-multipart"
   }
 }
