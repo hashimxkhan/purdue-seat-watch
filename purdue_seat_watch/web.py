@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from purdue_seat_watch import banner
 from purdue_seat_watch.db import SessionLocal, Subscription, count_distinct_emails, count_subscriptions_for_email, init_db
 from purdue_seat_watch.term import term_code
 
@@ -37,6 +38,36 @@ def get_session() -> Session:
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse(request, "signup.html", {})
+
+
+@app.get("/api/sections")
+def api_sections(year: int, season: str, subject: str, course_number: str):
+    """Live section + meeting-time lookup for the signup form's autocomplete.
+    Best-effort: any failure (bad term, Banner hiccup) just yields no results
+    rather than an error, so the form still works if this widget can't."""
+    subject = subject.strip().upper()
+    course_number = course_number.strip()
+    try:
+        term = term_code(year, season)
+    except ValueError:
+        return {"sections": []}
+    if not subject or not course_number:
+        return {"sections": []}
+
+    try:
+        sections = banner.search_sections(term, subject, course_number)
+    except Exception:
+        return {"sections": []}
+
+    return {
+        "sections": [
+            {
+                "section_code": s.section_code,
+                "meetings": [{"days": m.days, "time": m.time, "type": m.type} for m in s.meetings],
+            }
+            for s in sections
+        ]
+    }
 
 
 @app.post("/subscribe", response_class=HTMLResponse)

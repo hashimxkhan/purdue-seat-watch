@@ -19,7 +19,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-from purdue_seat_watch.models import Section, SeatInfo
+from purdue_seat_watch.models import Meeting, Section, SeatInfo
 
 BASE_URL = "https://selfservice.mypurdue.purdue.edu/prod"
 SEARCH_URL = f"{BASE_URL}/bwckschd.p_get_crse_unsec"
@@ -111,6 +111,26 @@ def get_seat_info(
     return parse_seat_info(response.text)
 
 
+def _parse_meetings(header_cell) -> tuple[Meeting, ...]:
+    """Each section's meeting-time table lives in the sibling <tr> right after
+    the one holding its th.ddlabel header -- same response, no extra request."""
+    header_row = header_cell.find_parent("tr")
+    detail_row = header_row.find_next_sibling("tr") if header_row else None
+    if detail_row is None:
+        return ()
+    meetings_table = detail_row.find("table", class_="datadisplaytable")
+    if meetings_table is None:
+        return ()
+
+    meetings = []
+    for row in meetings_table.find_all("tr"):
+        cells = [cell.get_text(strip=True) for cell in row.find_all("td")]
+        if len(cells) < 6:
+            continue  # the header row uses <th>, not <td> -- find_all("td") skips it naturally
+        meetings.append(Meeting(type=cells[0], time=cells[1], days=cells[2], schedule_type=cells[5]))
+    return tuple(meetings)
+
+
 def parse_search_results(html: str) -> list[Section]:
     soup = BeautifulSoup(html, "html.parser")
     if "No classes were found" in soup.get_text():
@@ -133,6 +153,7 @@ def parse_search_results(html: str) -> list[Section]:
                 course_number=match.group("course_number"),
                 section_code=match.group("section"),
                 title=match.group("title").strip(),
+                meetings=_parse_meetings(header_cell),
             )
         )
     return sections

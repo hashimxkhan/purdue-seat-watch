@@ -1,86 +1,478 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Purdue Seat Watch</title>
-  <style>
-    body { font-family: -apple-system, system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; color: #1a1a1a; }
-    h1 { font-size: 1.4rem; }
-    p.tagline { color: #555; margin-top: -0.5rem; }
-    form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem; }
-    label { font-size: 0.85rem; font-weight: 600; }
-    input, select { padding: 0.5rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; }
-    .row { display: flex; gap: 0.75rem; }
-    .row > div { flex: 1; }
-    button { margin-top: 0.5rem; padding: 0.6rem; font-size: 1rem; border: none; border-radius: 6px; background: #cfb991; color: #000; font-weight: 600; cursor: pointer; }
-    button:hover { background: #b8a279; }
-    .status { padding: 0.75rem; border-radius: 6px; margin-top: 1rem; }
-    .status.subscribed { background: #e6f4ea; color: #1e7e34; }
-    .status.already_subscribed { background: #eef; color: #333; }
-    .errors { padding: 0.75rem; border-radius: 6px; margin-top: 1rem; background: #fdecea; color: #a4262c; }
-    .errors ul { margin: 0; padding-left: 1.2rem; }
-    small { color: #777; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Purdue Seat Watch</title>
+<style>
+  :root {
+    --black: #000000;
+    --black-soft: #141210;
+    --gold: #CFB991;
+    --gold-deep: #A9822E;
+    --cream: #FAF7F0;
+    --surface: #FFFFFF;
+    --ink: #1A1712;
+    --muted: #6E6656;
+    --border: #E7E0CE;
+    --error: #9A3B2E;
+    --error-bg: #F8EAE5;
+    --error-border: #E3C3B7;
+    --success-bg: #FBF3DE;
+    --success-border: var(--gold);
+    --font-display: ui-sans-serif, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --cream: #121009;
+      --surface: #1A1710;
+      --ink: #F1ECDD;
+      --muted: #B0A78F;
+      --border: #322C1E;
+      --error: #E2917E;
+      --error-bg: #2B1712;
+      --error-border: #4A2B21;
+      --success-bg: #26200D;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .hero {
+    background: linear-gradient(180deg, var(--black) 0%, var(--black-soft) 100%);
+    color: #EDE7D6;
+    padding: 3.5rem 1.5rem 3rem;
+    text-align: center;
+  }
+
+  .hero-inner { max-width: 40rem; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(1.9rem, 5vw, 2.6rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 0 0.9rem;
+    text-wrap: balance;
+  }
+
+  h1 .accent { color: var(--gold); }
+
+  .tagline {
+    color: #C9C2AE;
+    font-size: 1.05rem;
+    max-width: 30rem;
+    margin: 0 auto;
+  }
+
+  .steps {
+    display: flex;
+    justify-content: center;
+    gap: 2.5rem;
+    margin-top: 2.5rem;
+    flex-wrap: wrap;
+  }
+
+  .step { max-width: 10rem; }
+
+  .step-num {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.5rem;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 0.4rem;
+  }
+
+  .step-label {
+    font-size: 0.86rem;
+    color: #D9D3C1;
+  }
+
+  main {
+    max-width: 30rem;
+    margin: 2rem auto 4rem;
+    padding: 0 1.25rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 2rem;
+    box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.35);
+  }
+
+  .card h2 {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 1.3rem;
+  }
+
+  form { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+
+  input, select {
+    width: 100%;
+    padding: 0.65rem 0.75rem;
+    font-size: 1rem;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    transition: border-color 0.15s ease;
+  }
+
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--gold-deep);
+  }
+
+  .row { display: flex; gap: 0.9rem; }
+  .row > div { flex: 1; }
+
+  .hint {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .section-suggestions {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .section-suggestions[hidden] { display: none; }
+
+  .suggestion {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    font-family: var(--font-body);
+    font-size: 0.86rem;
+    color: var(--ink);
+    background: var(--cream);
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .suggestion:hover, .suggestion:focus-visible {
+    border-color: var(--gold-deep);
+    background: var(--surface);
+    outline: none;
+  }
+
+  .suggestion .code {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .suggestion .when {
+    color: var(--muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .suggestions-status {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  button {
+    margin-top: 0.3rem;
+    padding: 0.8rem;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    border: none;
+    border-radius: 8px;
+    background: var(--gold);
+    color: var(--black);
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  button:hover { background: var(--gold-deep); }
+  button:focus-visible { outline: 2px solid var(--gold-deep); outline-offset: 2px; }
+
+  .cap-note {
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .status, .errors {
+    max-width: 30rem;
+    margin: 2rem auto 0;
+    padding: 0 1.25rem;
+  }
+
+  .status .box, .errors .box {
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    font-size: 0.92rem;
+    border: 1.5px solid;
+  }
+
+  .status.subscribed .box {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+    color: var(--ink);
+  }
+
+  .status.already_subscribed .box {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--ink);
+  }
+
+  .errors .box {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error);
+  }
+
+  .errors ul { margin: 0; padding-left: 1.1rem; }
+
+  footer {
+    max-width: 30rem;
+    margin: 2.5rem auto 0;
+    padding: 0 1.25rem 2rem;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+</style>
 </head>
 <body>
-  <h1>Purdue Seat Watch</h1>
-  <p class="tagline">Get an email the moment a full class opens up a seat.</p>
+
+  <div class="hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Purdue Seat Watch</span>
+      <h1>Never miss a seat <span class="accent">opening up.</span></h1>
+      <p class="tagline">Pick a course section you're locked out of. We check Banner every couple minutes and email you the second a seat opens.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-label">Enter your course &amp; section</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-label">We poll Banner in the background</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-label">You get an email the instant it opens</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   {% if status == "subscribed" %}
-    <div class="status subscribed">You're in! We'll email you at the address you gave once a seat opens.</div>
+    <div class="status subscribed">
+      <div class="box">You're in! We'll email you at the address you gave once that seat opens.</div>
+    </div>
   {% elif status == "already_subscribed" %}
-    <div class="status already_subscribed">You're already watching that course.</div>
+    <div class="status already_subscribed">
+      <div class="box">You're already watching that section.</div>
+    </div>
   {% endif %}
 
   {% if errors %}
     <div class="errors">
-      <ul>
-        {% for error in errors %}<li>{{ error }}</li>{% endfor %}
-      </ul>
+      <div class="box">
+        <ul>
+          {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      </div>
     </div>
   {% endif %}
 
-  <form method="post" action="/subscribe">
-    <div>
-      <label for="email">Purdue email</label>
-      <input id="email" name="email" type="email" placeholder="you@purdue.edu" required>
-    </div>
+  <main>
+    <div class="card">
+      <h2>Watch a section</h2>
+      <form method="post" action="/subscribe">
+        <div>
+          <label for="email">Purdue email</label>
+          <input id="email" name="email" type="email" placeholder="you@purdue.edu" required>
+        </div>
 
-    <div class="row">
-      <div>
-        <label for="year">Year</label>
-        <input id="year" name="year" type="number" min="2020" max="2100" placeholder="2026" required>
-      </div>
-      <div>
-        <label for="season">Season</label>
-        <select id="season" name="season" required>
-          <option value="fall">Fall</option>
-          <option value="spring">Spring</option>
-          <option value="summer">Summer</option>
-        </select>
-      </div>
-    </div>
+        <div class="row">
+          <div>
+            <label for="year">Year</label>
+            <input id="year" name="year" type="number" min="2020" max="2100" placeholder="2026" required>
+          </div>
+          <div>
+            <label for="season">Season</label>
+            <select id="season" name="season" required>
+              <option value="fall">Fall</option>
+              <option value="spring">Spring</option>
+              <option value="summer">Summer</option>
+            </select>
+          </div>
+        </div>
 
-    <div class="row">
-      <div>
-        <label for="subject">Subject</label>
-        <input id="subject" name="subject" type="text" placeholder="CS" required>
-      </div>
-      <div>
-        <label for="course_number">Course number</label>
-        <input id="course_number" name="course_number" type="text" placeholder="35200" required>
-      </div>
-    </div>
+        <div class="row">
+          <div>
+            <label for="subject">Subject</label>
+            <input id="subject" name="subject" type="text" placeholder="CS" required>
+          </div>
+          <div>
+            <label for="course_number">Course number</label>
+            <input id="course_number" name="course_number" type="text" placeholder="35200" required>
+          </div>
+        </div>
 
-    <div>
-      <label for="section">Section</label>
-      <input id="section" name="section" type="text" placeholder="e.g. LE1" required>
-      <small>Look this up on Purdue's class search first -- each course can have many sections, and we only check the one(s) you pick.</small>
-    </div>
+        <div>
+          <label for="section">Section</label>
+          <input id="section" name="section" type="text" placeholder="e.g. LE1" autocomplete="off" required>
+          <span class="hint" id="section-hint">Enter a subject &amp; course number above and real sections will show up here -- or type a code directly if you already know it.</span>
+          <div class="section-suggestions" id="section-suggestions" hidden></div>
+        </div>
 
-    <button type="submit">Watch this course</button>
-    <small>Limited to {{ max_courses_per_email | default(3) }} courses per @purdue.edu address, {{ max_subscribers | default(200) }} subscribers total while we're small.</small>
-  </form>
+        <button type="submit">Watch this section</button>
+        <p class="cap-note">Limited to {{ max_courses_per_email | default(3) }} sections per @purdue.edu address, {{ max_subscribers | default(200) }} subscribers total while we're small.</p>
+      </form>
+    </div>
+  </main>
+
+  <footer>
+    Built independently by a Purdue student. Not affiliated with, endorsed by, or operated by Purdue University. Talks only to Purdue's public class-schedule pages -- never touches your myPurdue account.
+  </footer>
+
+  <script>
+    (function () {
+      var yearInput = document.getElementById("year");
+      var seasonInput = document.getElementById("season");
+      var subjectInput = document.getElementById("subject");
+      var courseInput = document.getElementById("course_number");
+      var sectionInput = document.getElementById("section");
+      var suggestionsBox = document.getElementById("section-suggestions");
+      var hint = document.getElementById("section-hint");
+
+      var debounceTimer = null;
+      var requestToken = 0;
+
+      function debounce(fn, delayMs) {
+        return function () {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(fn, delayMs);
+        };
+      }
+
+      function clearSuggestions() {
+        suggestionsBox.innerHTML = "";
+        suggestionsBox.hidden = true;
+      }
+
+      function formatWhen(meetings) {
+        if (!meetings.length) return "Time TBA";
+        return meetings.map(function (m) { return m.days + " " + m.time; }).join(" & ");
+      }
+
+      function renderSuggestions(sections) {
+        suggestionsBox.innerHTML = "";
+        if (!sections.length) {
+          suggestionsBox.hidden = true;
+          hint.textContent = "No sections found for that course -- double check the subject/number, or type a code manually.";
+          return;
+        }
+        sections.forEach(function (s) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "suggestion";
+          btn.innerHTML = '<span class="code">' + s.section_code + '</span><span class="when">' + formatWhen(s.meetings) + "</span>";
+          btn.addEventListener("click", function () {
+            sectionInput.value = s.section_code;
+            clearSuggestions();
+            hint.textContent = "Section " + s.section_code + " selected.";
+          });
+          suggestionsBox.appendChild(btn);
+        });
+        suggestionsBox.hidden = false;
+        hint.textContent = "Real sections for this course -- click one to fill it in.";
+      }
+
+      function loadSuggestions() {
+        var year = yearInput.value.trim();
+        var season = seasonInput.value;
+        var subject = subjectInput.value.trim();
+        var course = courseInput.value.trim();
+
+        if (!/^\d{4}$/.test(year) || !subject || course.length < 3) {
+          clearSuggestions();
+          return;
+        }
+
+        var token = ++requestToken;
+        hint.textContent = "Looking up sections...";
+        var params = new URLSearchParams({ year: year, season: season, subject: subject, course_number: course });
+
+        fetch("/api/sections?" + params.toString())
+          .then(function (res) { return res.ok ? res.json() : { sections: [] }; })
+          .then(function (data) {
+            if (token !== requestToken) return; // a newer request superseded this one
+            renderSuggestions(data.sections || []);
+          })
+          .catch(function () {
+            if (token !== requestToken) return;
+            clearSuggestions();
+          });
+      }
+
+      var debouncedLoad = debounce(loadSuggestions, 450);
+      [yearInput, seasonInput, subjectInput, courseInput].forEach(function (el) {
+        el.addEventListener("input", debouncedLoad);
+        el.addEventListener("change", debouncedLoad);
+      });
+    })();
+  </script>
+
 </body>
 </html>

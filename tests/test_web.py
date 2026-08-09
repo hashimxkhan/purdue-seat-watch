@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 from purdue_seat_watch import web
 from purdue_seat_watch.db import Subscription, get_engine, init_db
+from purdue_seat_watch.models import Meeting, Section
 
 
 @pytest.fixture
@@ -130,3 +131,50 @@ def test_subscriber_cap_does_not_block_an_existing_subscriber_adding_a_course(en
 
     assert response.status_code == 200
     assert len(_rows(factory)) == 201
+
+
+def test_api_sections_returns_sections_and_meetings(env, monkeypatch):
+    client, _ = env
+
+    def fake_search_sections(term, subject, course_number):
+        assert (term, subject, course_number) == ("202710", "CS", "35200")
+        return [
+            Section(
+                crn="15451", subject="CS", course_number="35200", section_code="LE1", title="Compilers",
+                meetings=(Meeting(type="Class", time="10:30 am - 11:45 am", days="TR", schedule_type="Lecture"),),
+            ),
+        ]
+
+    monkeypatch.setattr(web.banner, "search_sections", fake_search_sections)
+
+    response = client.get("/api/sections", params={"year": 2026, "season": "fall", "subject": "CS", "course_number": "35200"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "sections": [
+            {"section_code": "LE1", "meetings": [{"days": "TR", "time": "10:30 am - 11:45 am", "type": "Class"}]},
+        ]
+    }
+
+
+def test_api_sections_returns_empty_list_for_invalid_season(env):
+    client, _ = env
+
+    response = client.get("/api/sections", params={"year": 2026, "season": "winter", "subject": "CS", "course_number": "35200"})
+
+    assert response.status_code == 200
+    assert response.json() == {"sections": []}
+
+
+def test_api_sections_returns_empty_list_when_banner_fails(env, monkeypatch):
+    client, _ = env
+
+    def failing_search_sections(term, subject, course_number):
+        raise RuntimeError("Banner is down")
+
+    monkeypatch.setattr(web.banner, "search_sections", failing_search_sections)
+
+    response = client.get("/api/sections", params={"year": 2026, "season": "fall", "subject": "CS", "course_number": "35200"})
+
+    assert response.status_code == 200
+    assert response.json() == {"sections": []}
