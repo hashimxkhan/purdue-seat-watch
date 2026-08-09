@@ -23,6 +23,7 @@ class Watch:
     subject: str
     course_number: str
     section: str | None = None  # e.g. "001"; None means every section found
+    sections: frozenset[str] | None = None  # filter to any of these section codes; None means every section found
     crns: tuple[str, ...] | None = None  # bypass section search if you already know the CRN(s)
 
 
@@ -40,11 +41,13 @@ class SeatWatcher:
         banner: BannerClient,
         *,
         last_remaining: MutableMapping[str, int] | None = None,
+        request_delay_seconds: float = 0,
     ):
         self._config = config
         self._notifier = notifier
         self._banner = banner
         self._last_remaining: MutableMapping[str, int] = last_remaining if last_remaining is not None else {}
+        self._request_delay_seconds = request_delay_seconds
 
     @property
     def watches(self) -> tuple[Watch, ...]:
@@ -59,6 +62,8 @@ class SeatWatcher:
         sections = self._banner.search_sections(watch.term, watch.subject, watch.course_number)
         if watch.section:
             sections = [s for s in sections if s.section_code == watch.section]
+        elif watch.sections:
+            sections = [s for s in sections if s.section_code in watch.sections]
         return sections
 
     def check_once(self) -> None:
@@ -72,7 +77,9 @@ class SeatWatcher:
             if not sections:
                 logger.warning("No sections found for %s %s (term %s)", watch.subject, watch.course_number, watch.term)
 
-            for section in sections:
+            for i, section in enumerate(sections):
+                if i > 0 and self._request_delay_seconds:
+                    time.sleep(self._request_delay_seconds)
                 self._check_section(watch.term, section)
 
     def _check_section(self, term: str, section: Section) -> None:

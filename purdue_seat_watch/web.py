@@ -65,6 +65,8 @@ def subscribe(
         errors.append(str(exc))
     if not subject or not course_number:
         errors.append("Subject and course number are required.")
+    if not section:
+        errors.append("Section is required -- look up the section code on Purdue's class search first.")
 
     if not errors:
         existing_for_email = count_subscriptions_for_email(session, email)

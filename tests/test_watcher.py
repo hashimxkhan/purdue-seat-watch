@@ -102,6 +102,21 @@ def test_section_filter_only_checks_matching_section():
     assert "002" in notifier.calls[0][0]
 
 
+def test_sections_filter_checks_the_union_of_requested_sections():
+    banner = FakeBanner(
+        sections=[_section("111", "001"), _section("222", "002"), _section("333", "003")],
+        seat_sequences={"111": [_seats(0)], "222": [_seats(9)], "333": [_seats(2)]},
+    )
+    notifier = RecordingNotifier()
+    watch = Watch(term="202710", subject="CS", course_number="50200", sections=frozenset({"002", "003"}))
+    watcher = SeatWatcher(WatcherConfig(watches=(watch,)), notifier, banner)
+
+    watcher.check_once()
+
+    notified_sections = {event.section_code for event in notifier.events}
+    assert notified_sections == {"002", "003"}  # not "001" -- wasn't in the requested set
+
+
 def test_explicit_crns_skip_the_section_search():
     banner = FakeBanner(seat_sequences={"999": [_seats(1)]})
     notifier = RecordingNotifier()
@@ -141,6 +156,25 @@ def test_last_remaining_store_can_be_injected():
 
     assert notifier.calls == []  # already open per the injected store, so no edge transition
     assert store["111"] == 5
+
+
+def test_request_delay_sleeps_between_sections_but_not_before_the_first(monkeypatch):
+    sleeps: list[float] = []
+    monkeypatch.setattr("purdue_seat_watch.watcher.time.sleep", lambda s: sleeps.append(s))
+
+    banner = FakeBanner(
+        sections=[_section("111", "001"), _section("222", "002"), _section("333", "003")],
+        seat_sequences={"111": [_seats(0)], "222": [_seats(0)], "333": [_seats(0)]},
+    )
+    notifier = RecordingNotifier()
+    watcher = SeatWatcher(
+        WatcherConfig(watches=(Watch(term="202710", subject="CS", course_number="50200"),)),
+        notifier, banner, request_delay_seconds=0.3,
+    )
+
+    watcher.check_once()
+
+    assert sleeps == [0.3, 0.3]  # one fewer than the number of sections checked
 
 
 def test_a_failing_crn_does_not_stop_other_watches_from_being_checked():

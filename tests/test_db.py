@@ -8,6 +8,7 @@ from purdue_seat_watch.db import (
     count_distinct_emails,
     count_subscriptions_for_email,
     get_engine,
+    get_unique_course_sections,
     get_unique_courses,
     init_db,
 )
@@ -54,6 +55,32 @@ def test_get_unique_courses_dedupes_across_subscribers(session_factory):
 
     courses = get_unique_courses(session_factory)
     assert sorted(courses) == [("202710", "CS", "18000"), ("202710", "CS", "35200")]
+
+
+def test_get_unique_course_sections_groups_by_course(session_factory):
+    with session_factory() as session:
+        session.add(_sub("a@purdue.edu", course_number="35200", section="LE1"))
+        session.add(_sub("b@purdue.edu", course_number="35200", section="P02"))
+        session.add(_sub("c@purdue.edu", course_number="18000", section="L01"))
+        session.commit()
+
+    result = get_unique_course_sections(session_factory)
+
+    assert result == {
+        ("202710", "CS", "35200"): {"LE1", "P02"},
+        ("202710", "CS", "18000"): {"L01"},
+    }
+
+
+def test_get_unique_course_sections_includes_legacy_any_section_marker(session_factory):
+    with session_factory() as session:
+        session.add(_sub("a@purdue.edu", course_number="35200", section=""))  # pre-existing "any section" row
+        session.add(_sub("b@purdue.edu", course_number="35200", section="LE1"))
+        session.commit()
+
+    result = get_unique_course_sections(session_factory)
+
+    assert result[("202710", "CS", "35200")] == {"", "LE1"}
 
 
 def test_seat_state_store_persists_across_instances(session_factory):

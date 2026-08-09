@@ -35,7 +35,7 @@ def _submit(client, **overrides):
         "season": "fall",
         "subject": "CS",
         "course_number": "35200",
-        "section": "",
+        "section": "LE1",
     }
     data.update(overrides)
     return client.post("/subscribe", data=data)
@@ -73,6 +73,14 @@ def test_duplicate_signup_does_not_create_a_second_row(env):
     assert response.status_code == 200
     assert "already" in response.text.lower()
     assert len(_rows(factory)) == 1
+
+
+def test_empty_section_is_rejected(env):
+    client, factory = env
+    response = _submit(client, section="")
+
+    assert response.status_code == 400
+    assert _rows(factory) == []
 
 
 def test_invalid_season_is_rejected(env):

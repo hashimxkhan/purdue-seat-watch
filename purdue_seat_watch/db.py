@@ -87,6 +87,21 @@ def get_unique_courses(session_factory=SessionLocal) -> list[tuple[str, str, str
         return [tuple(row) for row in session.execute(stmt).all()]
 
 
+def get_unique_course_sections(session_factory=SessionLocal) -> dict[tuple[str, str, str], set[str]]:
+    """Every unique course mapped to the set of section codes anyone's watching for it.
+
+    A `""` in that set is a legacy "any section" subscription (from before section
+    became required at signup) -- the worker treats that as "check every section"
+    for the whole course, same as it always did, rather than narrowing.
+    """
+    with session_factory() as session:
+        stmt = select(Subscription.term, Subscription.subject, Subscription.course_number, Subscription.section)
+        result: dict[tuple[str, str, str], set[str]] = {}
+        for term, subject, course_number, section in session.execute(stmt).all():
+            result.setdefault((term, subject, course_number), set()).add(section)
+        return result
+
+
 def count_distinct_emails(session: Session) -> int:
     return session.execute(select(func.count(func.distinct(Subscription.email)))).scalar_one()
 
