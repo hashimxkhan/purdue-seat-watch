@@ -5,7 +5,7 @@ import os
 import time
 
 from purdue_seat_watch import banner
-from purdue_seat_watch.db import DbSeatStateStore, SessionLocal, get_unique_course_sections, init_db
+from purdue_seat_watch.db import DbSeatStateStore, SessionLocal, get_unique_course_crns, init_db
 from purdue_seat_watch.emailer import EmailNotifier
 from purdue_seat_watch.watcher import SeatWatcher, Watch, WatcherConfig
 
@@ -13,14 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 def build_watcher(interval_seconds: int, *, request_delay_seconds: float = 0) -> SeatWatcher:
-    course_sections = get_unique_course_sections(SessionLocal)
+    course_crns = get_unique_course_crns(SessionLocal)
+    # crns= bypasses Banner's section-search entirely (see watcher.resolve_sections) --
+    # the worker's only remaining Banner touchpoint is the actual seat-count check,
+    # which is unavoidable since live seat data exists nowhere else.
     watches = tuple(
-        # A "" in the requested set is a legacy "any section" subscription -- fall back
-        # to checking every section for that course, same as before section was required.
-        Watch(term=t, subject=s, course_number=c)
-        if "" in sections
-        else Watch(term=t, subject=s, course_number=c, sections=frozenset(sections))
-        for (t, s, c), sections in course_sections.items()
+        Watch(term=t, subject=s, course_number=c, crns=tuple(crns))
+        for (t, s, c), crns in course_crns.items()
     )
     config = WatcherConfig(watches=watches, interval_seconds=interval_seconds)
     notifier = EmailNotifier(SessionLocal)

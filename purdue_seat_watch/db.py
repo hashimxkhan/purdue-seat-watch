@@ -13,9 +13,10 @@ class Base(DeclarativeBase):
 
 
 class Subscription(Base):
-    """One subscriber's watch target. `section == ""` means 'any section'; kept as an
-    empty string rather than NULL so the unique constraint below actually dedupes
-    two 'any section' signups from the same email (SQL treats NULL != NULL)."""
+    """One subscriber's watch target. Identified by CRN (a specific section
+    offering), not a human-readable section code -- CRNs are unique within a
+    term and unambiguous, unlike section codes, and are what the signup form's
+    Purdue.io-backed picker actually returns."""
 
     __tablename__ = "subscriptions"
 
@@ -24,13 +25,13 @@ class Subscription(Base):
     term: Mapped[str] = mapped_column(String(6), nullable=False)
     subject: Mapped[str] = mapped_column(String(10), nullable=False)
     course_number: Mapped[str] = mapped_column(String(10), nullable=False)
-    section: Mapped[str] = mapped_column(String(10), nullable=False, default="")
+    crn: Mapped[str] = mapped_column(String(10), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
     __table_args__ = (
-        UniqueConstraint("email", "term", "subject", "course_number", "section", name="uq_subscription_target"),
+        UniqueConstraint("email", "term", "crn", name="uq_subscription_target"),
     )
 
 
@@ -81,24 +82,16 @@ def init_db(engine=None) -> None:
     Base.metadata.create_all(engine or _engine)
 
 
-def get_unique_courses(session_factory=SessionLocal) -> list[tuple[str, str, str]]:
+def get_unique_course_crns(session_factory=SessionLocal) -> dict[tuple[str, str, str], set[str]]:
+    """Every unique course mapped to the set of CRNs anyone's watching for it --
+    the worker builds one Watch per course, bypassing section search entirely
+    via its `crns=` filter, so a poll cycle only ever hits Banner for the CRNs
+    someone's actually asked about."""
     with session_factory() as session:
-        stmt = select(Subscription.term, Subscription.subject, Subscription.course_number).distinct()
-        return [tuple(row) for row in session.execute(stmt).all()]
-
-
-def get_unique_course_sections(session_factory=SessionLocal) -> dict[tuple[str, str, str], set[str]]:
-    """Every unique course mapped to the set of section codes anyone's watching for it.
-
-    A `""` in that set is a legacy "any section" subscription (from before section
-    became required at signup) -- the worker treats that as "check every section"
-    for the whole course, same as it always did, rather than narrowing.
-    """
-    with session_factory() as session:
-        stmt = select(Subscription.term, Subscription.subject, Subscription.course_number, Subscription.section)
+        stmt = select(Subscription.term, Subscription.subject, Subscription.course_number, Subscription.crn)
         result: dict[tuple[str, str, str], set[str]] = {}
-        for term, subject, course_number, section in session.execute(stmt).all():
-            result.setdefault((term, subject, course_number), set()).add(section)
+        for term, subject, course_number, crn in session.execute(stmt).all():
+            result.setdefault((term, subject, course_number), set()).add(crn)
         return result
 
 

@@ -188,9 +188,9 @@
 
   .suggestion {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
     width: 100%;
     padding: 0.55rem 0.7rem;
     font-family: var(--font-body);
@@ -210,15 +210,26 @@
     outline: none;
   }
 
-  .suggestion .code {
+  .suggestion .main-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: baseline;
+  }
+
+  .suggestion .type {
     font-weight: 700;
     letter-spacing: 0.02em;
   }
 
-  .suggestion .when {
+  .suggestion .schedule {
     color: var(--muted);
     font-size: 0.8rem;
-    white-space: nowrap;
+  }
+
+  .suggestion .instructor {
+    color: var(--muted);
+    font-size: 0.76rem;
   }
 
   .suggestions-status {
@@ -375,8 +386,9 @@
         </div>
 
         <div>
-          <label for="section">Section</label>
-          <input id="section" name="section" type="text" placeholder="Pick a section below" autocomplete="off" readonly required>
+          <label for="section-display">Section</label>
+          <input id="section-display" type="text" placeholder="Pick a section below" autocomplete="off" readonly required>
+          <input type="hidden" id="crn" name="crn">
           <span class="hint" id="section-hint">Enter a subject &amp; course number above, then click a real section below to select it.</span>
           <div class="section-suggestions" id="section-suggestions" hidden></div>
         </div>
@@ -397,7 +409,8 @@
       var seasonInput = document.getElementById("season");
       var subjectInput = document.getElementById("subject");
       var courseInput = document.getElementById("course_number");
-      var sectionInput = document.getElementById("section");
+      var sectionDisplay = document.getElementById("section-display");
+      var crnInput = document.getElementById("crn");
       var suggestionsBox = document.getElementById("section-suggestions");
       var hint = document.getElementById("section-hint");
 
@@ -416,32 +429,45 @@
         suggestionsBox.hidden = true;
       }
 
-      function formatWhen(meetings) {
-        if (!meetings.length) return "Time TBA";
-        return meetings.map(function (m) { return m.days + " " + m.time; }).join(" & ");
+      function clearSelection() {
+        crnInput.value = "";
+        sectionDisplay.value = "";
       }
 
       function renderSuggestions(sections) {
         suggestionsBox.innerHTML = "";
         if (!sections.length) {
           suggestionsBox.hidden = true;
-          hint.textContent = "No sections found for that course -- double check the subject/number, or type a code manually.";
+          hint.textContent = "No sections found for that course -- double check the subject/number.";
           return;
         }
         sections.forEach(function (s) {
           var btn = document.createElement("button");
           btn.type = "button";
           btn.className = "suggestion";
-          btn.innerHTML = '<span class="code">' + s.section_code + '</span><span class="when">' + formatWhen(s.meetings) + "</span>";
+
+          var mainLine = document.createElement("div");
+          mainLine.className = "main-line";
+          mainLine.innerHTML = '<span class="type">' + s.type + '</span><span class="schedule">' + s.schedule + "</span>";
+          btn.appendChild(mainLine);
+
+          if (s.instructor) {
+            var instructorLine = document.createElement("div");
+            instructorLine.className = "instructor";
+            instructorLine.textContent = s.instructor;
+            btn.appendChild(instructorLine);
+          }
+
           btn.addEventListener("click", function () {
-            sectionInput.value = s.section_code;
+            crnInput.value = s.crn;
+            sectionDisplay.value = s.type + " -- " + s.schedule;
             clearSuggestions();
-            hint.textContent = "Section " + s.section_code + " selected.";
+            hint.textContent = "Section selected.";
           });
           suggestionsBox.appendChild(btn);
         });
         suggestionsBox.hidden = false;
-        hint.textContent = "Real sections for this course -- click one to fill it in.";
+        hint.textContent = "Real sections for this course -- click one to select it.";
       }
 
       function loadSuggestions() {
@@ -473,8 +499,14 @@
 
       var debouncedLoad = debounce(loadSuggestions, 450);
       [yearInput, seasonInput, subjectInput, courseInput].forEach(function (el) {
-        el.addEventListener("input", debouncedLoad);
-        el.addEventListener("change", debouncedLoad);
+        el.addEventListener("input", function () {
+          clearSelection(); // any change to the course invalidates a previously picked CRN
+          debouncedLoad();
+        });
+        el.addEventListener("change", function () {
+          clearSelection();
+          debouncedLoad();
+        });
       });
     })();
   </script>

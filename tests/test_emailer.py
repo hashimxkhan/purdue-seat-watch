@@ -12,10 +12,10 @@ def session_factory(tmp_path):
     init_db(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory() as session:
-        session.add(Subscription(email="any@purdue.edu", term="202710", subject="CS", course_number="35200", section=""))
-        session.add(Subscription(email="le1@purdue.edu", term="202710", subject="CS", course_number="35200", section="LE1"))
-        session.add(Subscription(email="p01@purdue.edu", term="202710", subject="CS", course_number="35200", section="P01"))
-        session.add(Subscription(email="other@purdue.edu", term="202710", subject="CS", course_number="18000", section=""))
+        session.add(Subscription(email="le1@purdue.edu", term="202710", subject="CS", course_number="35200", crn="15451"))
+        session.add(Subscription(email="also-le1@purdue.edu", term="202710", subject="CS", course_number="35200", crn="15451"))
+        session.add(Subscription(email="p01@purdue.edu", term="202710", subject="CS", course_number="35200", crn="15454"))
+        session.add(Subscription(email="other-term@purdue.edu", term="202620", subject="CS", course_number="35200", crn="15451"))
         session.commit()
     return factory
 
@@ -31,36 +31,36 @@ def sent_emails(monkeypatch):
     return calls
 
 
-def _event(section_code="LE1"):
+def _event(crn="15451"):
     return NotifyEvent(
-        term="202710", subject="CS", course_number="35200", section_code=section_code,
-        crn="15451", remaining=5, capacity=132,
+        term="202710", subject="CS", course_number="35200", section_code="",
+        crn=crn, remaining=5, capacity=132,
     )
 
 
-def test_emails_any_section_and_matching_section_subscribers(session_factory, sent_emails):
+def test_emails_every_subscriber_watching_that_crn(session_factory, sent_emails):
     notifier = EmailNotifier(session_factory, from_address="test@example.com", api_key="fake")
 
-    notifier.notify("Seat open: CS 35200-LE1", "5 seat(s) now available.", event=_event("LE1"))
+    notifier.notify("Seat open: CS 35200", "5 seat(s) now available.", event=_event("15451"))
 
     recipients = {call["to"][0] for call in sent_emails}
-    assert recipients == {"any@purdue.edu", "le1@purdue.edu"}
+    assert recipients == {"le1@purdue.edu", "also-le1@purdue.edu"}
 
 
-def test_does_not_email_other_section_or_other_course_subscribers(session_factory, sent_emails):
+def test_does_not_email_other_crn_or_other_term_subscribers(session_factory, sent_emails):
     notifier = EmailNotifier(session_factory, from_address="test@example.com", api_key="fake")
 
-    notifier.notify("Seat open: CS 35200-LE1", "5 seat(s) now available.", event=_event("LE1"))
+    notifier.notify("Seat open: CS 35200", "5 seat(s) now available.", event=_event("15451"))
 
     recipients = {call["to"][0] for call in sent_emails}
-    assert "p01@purdue.edu" not in recipients
-    assert "other@purdue.edu" not in recipients
+    assert "p01@purdue.edu" not in recipients  # different CRN
+    assert "other-term@purdue.edu" not in recipients  # same CRN number, different term
 
 
 def test_sends_one_call_per_recipient_not_a_shared_to_list(session_factory, sent_emails):
     notifier = EmailNotifier(session_factory, from_address="test@example.com", api_key="fake")
 
-    notifier.notify("Seat open: CS 35200-LE1", "5 seat(s) now available.", event=_event("LE1"))
+    notifier.notify("Seat open: CS 35200", "5 seat(s) now available.", event=_event("15451"))
 
     assert len(sent_emails) == 2
     for call in sent_emails:
@@ -79,25 +79,25 @@ def test_a_failed_send_does_not_stop_the_remaining_recipients(session_factory, m
     sent = []
 
     def flaky_send(params):
-        if params["to"][0] == "any@purdue.edu":
+        if params["to"][0] == "le1@purdue.edu":
             raise RuntimeError("simulated Resend API failure")
         sent.append(params)
 
     monkeypatch.setattr("purdue_seat_watch.emailer.resend.Emails.send", flaky_send)
     notifier = EmailNotifier(session_factory, from_address="test@example.com", api_key="fake")
 
-    notifier.notify("Seat open: CS 35200-LE1", "5 seat(s) now available.", event=_event("LE1"))  # does not raise
+    notifier.notify("Seat open: CS 35200", "5 seat(s) now available.", event=_event("15451"))  # does not raise
 
-    assert {call["to"][0] for call in sent} == {"le1@purdue.edu"}
+    assert {call["to"][0] for call in sent} == {"also-le1@purdue.edu"}
 
 
 def test_no_matching_subscribers_sends_nothing(session_factory, sent_emails):
     notifier = EmailNotifier(session_factory, from_address="test@example.com", api_key="fake")
 
     event = NotifyEvent(
-        term="202710", subject="CS", course_number="50200", section_code="001",
+        term="202710", subject="CS", course_number="50200", section_code="",
         crn="99999", remaining=1, capacity=30,
-    )  # no subscribers exist for this course at all
+    )  # no subscribers exist for this CRN at all
     notifier.notify("Seat open", "1 seat", event=event)
 
     assert sent_emails == []

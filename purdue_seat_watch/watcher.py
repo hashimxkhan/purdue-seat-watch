@@ -56,7 +56,7 @@ class SeatWatcher:
     def resolve_sections(self, watch: Watch) -> list[Section]:
         if watch.crns:
             return [
-                Section(crn=crn, subject=watch.subject, course_number=watch.course_number, section_code="?", title="")
+                Section(crn=crn, subject=watch.subject, course_number=watch.course_number, section_code="", title="")
                 for crn in watch.crns
             ]
         sections = self._banner.search_sections(watch.term, watch.subject, watch.course_number)
@@ -92,7 +92,9 @@ class SeatWatcher:
         was_open = self._last_remaining.get(section.crn, 0) > 0
         self._last_remaining[section.crn] = seats.remaining
 
-        label = f"{section.subject} {section.course_number}-{section.section_code}".strip()
+        label = f"{section.subject} {section.course_number}"
+        if section.section_code:
+            label += f"-{section.section_code}"
         logger.info("%s (CRN %s): %d/%d remaining", label, section.crn, seats.remaining, seats.capacity)
 
         if seats.is_open and not was_open:

@@ -8,8 +8,7 @@ from purdue_seat_watch.db import (
     count_distinct_emails,
     count_subscriptions_for_email,
     get_engine,
-    get_unique_course_sections,
-    get_unique_courses,
+    get_unique_course_crns,
     init_db,
 )
 
@@ -21,8 +20,8 @@ def session_factory(tmp_path):
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
-def _sub(email, term="202710", subject="CS", course_number="35200", section=""):
-    return Subscription(email=email, term=term, subject=subject, course_number=course_number, section=section)
+def _sub(email, term="202710", subject="CS", course_number="35200", crn="15451"):
+    return Subscription(email=email, term=term, subject=subject, course_number=course_number, crn=crn)
 
 
 def test_duplicate_subscription_is_rejected(session_factory):
@@ -36,51 +35,29 @@ def test_duplicate_subscription_is_rejected(session_factory):
             session.commit()
 
 
-def test_different_section_is_not_a_duplicate(session_factory):
+def test_different_crn_is_not_a_duplicate(session_factory):
     with session_factory() as session:
-        session.add(_sub("a@purdue.edu", section=""))
-        session.add(_sub("a@purdue.edu", section="LE1"))
+        session.add(_sub("a@purdue.edu", crn="15451"))
+        session.add(_sub("a@purdue.edu", crn="15456"))
         session.commit()  # should not raise
 
     with session_factory() as session:
         assert session.query(Subscription).count() == 2
 
 
-def test_get_unique_courses_dedupes_across_subscribers(session_factory):
+def test_get_unique_course_crns_groups_by_course(session_factory):
     with session_factory() as session:
-        session.add(_sub("a@purdue.edu", course_number="35200"))
-        session.add(_sub("b@purdue.edu", course_number="35200", section="LE1"))
-        session.add(_sub("c@purdue.edu", course_number="18000"))
+        session.add(_sub("a@purdue.edu", course_number="35200", crn="15451"))
+        session.add(_sub("b@purdue.edu", course_number="35200", crn="15456"))
+        session.add(_sub("c@purdue.edu", course_number="18000", crn="13610"))
         session.commit()
 
-    courses = get_unique_courses(session_factory)
-    assert sorted(courses) == [("202710", "CS", "18000"), ("202710", "CS", "35200")]
-
-
-def test_get_unique_course_sections_groups_by_course(session_factory):
-    with session_factory() as session:
-        session.add(_sub("a@purdue.edu", course_number="35200", section="LE1"))
-        session.add(_sub("b@purdue.edu", course_number="35200", section="P02"))
-        session.add(_sub("c@purdue.edu", course_number="18000", section="L01"))
-        session.commit()
-
-    result = get_unique_course_sections(session_factory)
+    result = get_unique_course_crns(session_factory)
 
     assert result == {
-        ("202710", "CS", "35200"): {"LE1", "P02"},
-        ("202710", "CS", "18000"): {"L01"},
+        ("202710", "CS", "35200"): {"15451", "15456"},
+        ("202710", "CS", "18000"): {"13610"},
     }
-
-
-def test_get_unique_course_sections_includes_legacy_any_section_marker(session_factory):
-    with session_factory() as session:
-        session.add(_sub("a@purdue.edu", course_number="35200", section=""))  # pre-existing "any section" row
-        session.add(_sub("b@purdue.edu", course_number="35200", section="LE1"))
-        session.commit()
-
-    result = get_unique_course_sections(session_factory)
-
-    assert result[("202710", "CS", "35200")] == {"", "LE1"}
 
 
 def test_seat_state_store_persists_across_instances(session_factory):
@@ -99,9 +76,9 @@ def test_seat_state_store_raises_key_error_for_unknown_crn(session_factory):
 
 def test_count_distinct_emails(session_factory):
     with session_factory() as session:
-        session.add(_sub("a@purdue.edu", course_number="35200"))
-        session.add(_sub("a@purdue.edu", course_number="18000"))
-        session.add(_sub("b@purdue.edu", course_number="35200"))
+        session.add(_sub("a@purdue.edu", course_number="35200", crn="15451"))
+        session.add(_sub("a@purdue.edu", course_number="18000", crn="13610"))
+        session.add(_sub("b@purdue.edu", course_number="35200", crn="15451"))
         session.commit()
 
         assert count_distinct_emails(session) == 2

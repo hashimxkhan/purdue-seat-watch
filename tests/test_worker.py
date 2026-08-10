@@ -20,9 +20,9 @@ def session_factory(tmp_path, monkeypatch):
 
 def test_build_watcher_coalesces_one_watch_per_unique_course(session_factory):
     with session_factory() as session:
-        session.add(Subscription(email="a@purdue.edu", term="202710", subject="CS", course_number="35200", section="LE1"))
-        session.add(Subscription(email="b@purdue.edu", term="202710", subject="CS", course_number="35200", section="P02"))
-        session.add(Subscription(email="c@purdue.edu", term="202710", subject="CS", course_number="18000", section="L01"))
+        session.add(Subscription(email="a@purdue.edu", term="202710", subject="CS", course_number="35200", crn="15451"))
+        session.add(Subscription(email="b@purdue.edu", term="202710", subject="CS", course_number="35200", crn="15456"))
+        session.add(Subscription(email="c@purdue.edu", term="202710", subject="CS", course_number="18000", crn="13610"))
         session.commit()
 
     watcher = build_watcher(interval_seconds=90)
@@ -33,30 +33,18 @@ def test_build_watcher_coalesces_one_watch_per_unique_course(session_factory):
     assert courses == {("202710", "CS", "35200"), ("202710", "CS", "18000")}
 
 
-def test_build_watcher_narrows_to_requested_sections(session_factory):
+def test_build_watcher_uses_crns_bypassing_section_search(session_factory):
     with session_factory() as session:
-        session.add(Subscription(email="a@purdue.edu", term="202710", subject="CS", course_number="35200", section="LE1"))
-        session.add(Subscription(email="b@purdue.edu", term="202710", subject="CS", course_number="35200", section="P02"))
+        session.add(Subscription(email="a@purdue.edu", term="202710", subject="CS", course_number="35200", crn="15451"))
+        session.add(Subscription(email="b@purdue.edu", term="202710", subject="CS", course_number="35200", crn="15456"))
         session.commit()
 
     watcher = build_watcher(interval_seconds=90)
 
     (watch,) = watcher.watches
-    assert watch.sections == frozenset({"LE1", "P02"})
-    assert watch.section is None  # narrowing goes through the plural `sections` field, not `section`
-
-
-def test_build_watcher_falls_back_to_all_sections_for_legacy_any_section_row(session_factory):
-    with session_factory() as session:
-        session.add(Subscription(email="a@purdue.edu", term="202710", subject="CS", course_number="35200", section=""))
-        session.add(Subscription(email="b@purdue.edu", term="202710", subject="CS", course_number="35200", section="LE1"))
-        session.commit()
-
-    watcher = build_watcher(interval_seconds=90)
-
-    (watch,) = watcher.watches
-    assert watch.sections is None  # "" present -> check every section, same as pre-required-section behavior
+    assert set(watch.crns) == {"15451", "15456"}
     assert watch.section is None
+    assert watch.sections is None
 
 
 def test_build_watcher_with_no_subscriptions_yields_no_watches(session_factory):

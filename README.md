@@ -22,19 +22,28 @@ Purdue runs classic Ellucian Banner 8. Its normal "Look Up Classes" search
 requires a myPurdue login, but Banner also exposes an older, unauthenticated
 search used for public catalog browsing:
 
-- `bwckschd.p_get_crse_unsec` — search sections by term/subject/course number, no login. Also returns each section's scheduled meeting days/times.
-- `bwckschd.p_disp_detail_sched` — per-CRN detail page with live `Capacity / Actual / Remaining` seat counts, also no login.
+- `bwckschd.p_get_crse_unsec` — search sections by term/subject/course number, no login.
+- `bwckschd.p_disp_detail_sched` — per-CRN detail page with live `Capacity / Actual / Remaining` seat counts, also no login. **This is the only thing that has to come from Banner** — no other public source has live seat availability.
 
 Neither endpoint needs credentials or cookies — they're plain
-server-rendered HTML forms. This tool POSTs/GETs them directly and parses the
+server-rendered HTML forms. This tool GETs them directly and parses the
 response tables with BeautifulSoup ([banner.py](purdue_seat_watch/banner.py)). No myPurdue account is ever touched.
 
-Both usage paths share this same scraper, plus the edge-triggered
-"only notify on closed→open" logic in [watcher.py](purdue_seat_watch/watcher.py) — notifications fire once when a
-watched section flips from 0 remaining (or unseen) to available, not on
-every single poll while it stays open. If it closes and reopens later,
-you're notified again. **On the very first check, an already-open section
-counts as newly opened**, so expect an immediate notification for it.
+For everything *except* live seat counts — which sections exist, their CRNs,
+meeting days/times, instructors — the hosted site instead queries
+[Purdue.io](https://github.com/Purdue-io/PurdueApi) (`api.purdue.io`), a
+third-party, open-source catalog mirror ([purdueio.py](purdue_seat_watch/purdueio.py)). This keeps the highest-volume,
+bursty traffic (the signup form's live section lookup, firing on every
+keystroke from every visitor) off Banner entirely — Banner is only ever hit
+for the actual per-CRN seat-count poll, which is slow, predictable, and
+unavoidable.
+
+Both usage paths share the edge-triggered "only notify on closed→open" logic
+in [watcher.py](purdue_seat_watch/watcher.py) — notifications fire once when a watched section flips from 0
+remaining (or unseen) to available, not on every single poll while it stays
+open. If it closes and reopens later, you're notified again. **On the very
+first check, an already-open section counts as newly opened**, so expect an
+immediate notification for it.
 
 ---
 
@@ -42,19 +51,23 @@ counts as newly opened**, so expect an immediate notification for it.
 
 1. Go to [the live site](https://purdue-seat-watch-production.up.railway.app/).
 2. Enter your `@purdue.edu` email, the term (year + season), subject, and course number.
-3. Pick a **section** — as you type the subject/course number, real sections
-   for that course (with their actual meeting days/times, pulled live from
-   Banner) show up as clickable suggestions. You can also just type a section
-   code directly if you already know it.
+3. Pick a **section** from the list — as you type the subject/course number,
+   real sections for that course show up as clickable suggestions, each
+   showing its type (Lecture/Lab/etc.), meeting days/time, and instructor
+   when available. The picker is click-only by design (the underlying field
+   is read-only); there's no way to type a section in manually, since a typo
+   or a pasted "CRN-section" string from Purdue's own tools would otherwise
+   silently create a subscription that can never match anything.
 4. Submit. You'll get an email at that address the moment that section shows
    an open seat.
 
 A few things worth knowing:
 
-- **Section is required.** Unlike the CLI (which can watch "every section" of
-  a course), the hosted site always watches specific sections you pick — this
-  keeps the background poller from hitting Banner once per section of every
-  course, for every course anyone's watching.
+- **A specific section is required**, and identified internally by CRN, not
+  a human-readable section code. Unlike the CLI (which can watch "every
+  section" of a course), the hosted site always watches specific sections —
+  this keeps the background poller from hitting Banner once per section of
+  every course, for every course anyone's watching.
 - **Limits while this is small**: 200 subscribers total, 3 sections watched
   per email address.
 - **No unsubscribe UI yet** — if you want to stop watching something, that's
@@ -68,17 +81,22 @@ A few things worth knowing:
 The hosted site runs as two processes sharing one Postgres database:
 
 ```
-purdue_seat_watch/web.py     — FastAPI signup site (the form + /subscribe + a
-                                 live /api/sections lookup for the JS widget)
-purdue_seat_watch/worker.py  — background poller: coalesces every subscriber's
-                                 watched courses into one Banner check per
-                                 unique course+section, emails via Resend on
-                                 open, persists seat state in Postgres so a
-                                 restart doesn't re-fire stale notifications
-purdue_seat_watch/emailer.py — Resend-backed Notifier, looks up matching
-                                 subscribers per section and emails each one
-purdue_seat_watch/db.py      — SQLAlchemy models (Subscription, SeatState),
-                                 Postgres in production, SQLite by default locally
+purdue_seat_watch/web.py      — FastAPI signup site (the form + /subscribe + a
+                                  live /api/sections lookup, backed by Purdue.io,
+                                  for the JS widget)
+purdue_seat_watch/purdueio.py — client for api.purdue.io: section/meeting-time
+                                  lookups that don't need to touch Banner at all
+purdue_seat_watch/worker.py   — background poller: coalesces every subscriber's
+                                  watched CRNs into one Watch per course, using
+                                  watcher.py's crns= bypass so Banner is only
+                                  ever hit for the actual seat-count check;
+                                  persists seat state in Postgres so a restart
+                                  doesn't re-fire stale notifications
+purdue_seat_watch/emailer.py  — Resend-backed Notifier, looks up every
+                                  subscriber watching a CRN (unique within a
+                                  term) and emails each one
+purdue_seat_watch/db.py       — SQLAlchemy models (Subscription, SeatState),
+                                  Postgres in production, SQLite by default locally
 ```
 
 **Local dev** (defaults to a local SQLite file, zero setup):
@@ -111,6 +129,15 @@ python -m purdue_seat_watch.worker                        # terminal 2
   | `REQUEST_DELAY_SECONDS` | `0.3` | pause between per-section Banner calls within a poll cycle, so a course with many sections doesn't hammer Banner in a tight burst; default `0.3` |
 
 - Set a spend/usage cap in Railway's billing settings before real traffic hits it.
+
+**Upgrading an existing deployment from before the CRN migration?** `Subscription`'s
+schema changed (`section` → `crn`, unique constraint now on `email, term, crn`).
+There's no Alembic here (deliberate, given the project's size) — `init_db()`
+only creates tables that don't exist yet, it won't alter an existing one.
+Simplest fix, since this table only ever held disposable signup data anyway:
+connect to the Postgres instance and run `DROP TABLE subscriptions;` before
+the next deploy — `init_db()` recreates it with the new schema automatically
+on the next `web`/`worker` startup. `seat_states` is unaffected, no action needed there.
 
 ---
 
