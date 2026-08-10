@@ -8,6 +8,10 @@ from purdue_seat_watch.db import Subscription, get_engine, init_db
 from purdue_seat_watch.models import Meeting, Section
 
 
+def _fake_section(code: str) -> Section:
+    return Section(crn="00000", subject="CS", course_number="00000", section_code=code, title="Fake")
+
+
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     engine = get_engine(f"sqlite:///{tmp_path / 'test.db'}")
@@ -21,6 +25,10 @@ def env(tmp_path, monkeypatch):
     # Schema is already created against the test engine above; stub out the
     # startup hook so it doesn't touch the real default (./local.db) engine.
     monkeypatch.setattr(web, "init_db", lambda: None)
+    # /subscribe now verifies the submitted section against a live Banner search --
+    # default to a permissive fake so tests unrelated to that check aren't hitting
+    # the network. Tests that care about this specifically override it themselves.
+    monkeypatch.setattr(web.banner, "search_sections", lambda term, subject, course_number: [_fake_section("LE1")])
     web.app.dependency_overrides[web.get_session] = override_get_session
     try:
         with TestClient(web.app) as test_client:
@@ -131,6 +139,44 @@ def test_subscriber_cap_does_not_block_an_existing_subscriber_adding_a_course(en
 
     assert response.status_code == 200
     assert len(_rows(factory)) == 201
+
+
+def test_section_not_offered_by_banner_is_rejected(env, monkeypatch):
+    client, factory = env
+    monkeypatch.setattr(web.banner, "search_sections", lambda term, subject, course_number: [_fake_section("LE1")])
+
+    response = _submit(client, section="39409-113")  # garbage a user pasted in, not a real section
+
+    assert response.status_code == 400
+    assert "39409-113" in response.text
+    assert _rows(factory) == []
+
+
+def test_section_matching_a_real_banner_section_is_accepted(env, monkeypatch):
+    client, factory = env
+    monkeypatch.setattr(
+        web.banner, "search_sections",
+        lambda term, subject, course_number: [_fake_section("LE1"), _fake_section("P02")],
+    )
+
+    response = _submit(client, section="P02")
+
+    assert response.status_code == 200
+    assert len(_rows(factory)) == 1
+
+
+def test_signup_still_succeeds_when_banner_verification_fails(env, monkeypatch):
+    client, factory = env
+
+    def failing_search_sections(term, subject, course_number):
+        raise RuntimeError("Banner is down")
+
+    monkeypatch.setattr(web.banner, "search_sections", failing_search_sections)
+
+    response = _submit(client)  # can't verify the section, but shouldn't block the signup over Banner being down
+
+    assert response.status_code == 200
+    assert len(_rows(factory)) == 1
 
 
 def test_api_sections_returns_sections_and_meetings(env, monkeypatch):

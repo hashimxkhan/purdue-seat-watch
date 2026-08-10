@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,6 +14,8 @@ from sqlalchemy.orm import Session
 from purdue_seat_watch import banner
 from purdue_seat_watch.db import SessionLocal, Subscription, count_distinct_emails, count_subscriptions_for_email, init_db
 from purdue_seat_watch.term import term_code
+
+logger = logging.getLogger(__name__)
 
 MAX_SUBSCRIBERS = 200
 MAX_COURSES_PER_EMAIL = 3
@@ -98,6 +101,17 @@ def subscribe(
         errors.append("Subject and course number are required.")
     if not section:
         errors.append("Section is required -- look up the section code on Purdue's class search first.")
+
+    if not errors:
+        try:
+            real_sections = banner.search_sections(term, subject, course_number)
+        except Exception:
+            # Banner hiccup: don't block a legitimate signup over an infra blip --
+            # the worker will just find nothing to watch if the section was bad anyway.
+            logger.warning("Could not verify %s %s-%s against Banner; allowing signup unverified", subject, course_number, section, exc_info=True)
+        else:
+            if section not in {s.section_code for s in real_sections}:
+                errors.append(f"'{section}' isn't a real section for {subject} {course_number} this term -- pick one from the list.")
 
     if not errors:
         existing_for_email = count_subscriptions_for_email(session, email)

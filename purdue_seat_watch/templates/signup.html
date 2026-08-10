@@ -162,6 +162,11 @@
     border-color: var(--gold-deep);
   }
 
+  input[readonly] {
+    cursor: default;
+    background: var(--cream);
+  }
+
   .row { display: flex; gap: 0.9rem; }
   .row > div { flex: 1; }
 
@@ -371,8 +376,8 @@
 
         <div>
           <label for="section">Section</label>
-          <input id="section" name="section" type="text" placeholder="e.g. LE1" autocomplete="off" required>
-          <span class="hint" id="section-hint">Enter a subject &amp; course number above and real sections will show up here -- or type a code directly if you already know it.</span>
+          <input id="section" name="section" type="text" placeholder="Pick a section below" autocomplete="off" readonly required>
+          <span class="hint" id="section-hint">Enter a subject &amp; course number above, then click a real section below to select it.</span>
           <div class="section-suggestions" id="section-suggestions" hidden></div>
         </div>
 
